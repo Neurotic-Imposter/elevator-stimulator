@@ -1,0 +1,8 @@
+floors=10
+elevators=3
+capacity=600
+tickMillis=300
+# scheduler: NEAREST or SCAN
+scheduler=NEAREST
+animation=on
+seed=42
