@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elevator Simulator · Java engine, browser view</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo">▮▮</span><div><b>Elevator Simulator</b><small>Real Java engine · every animation comes from its state</small></div></div>
+  <div class="kpis">
+    <div class="kpi"><small>Status</small><b id="k-status" class="pill">…</b></div>
+    <div class="kpi"><small>Tick</small><b id="k-tick">0</b></div>
+    <div class="kpi"><small>Pending requests</small><b id="k-pending">0</b></div>
+    <div class="kpi"><small>Faults</small><b id="k-faults">0</b></div>
+    <div class="kpi"><small>Scheduler</small>
+      <select id="k-sched" title="Switch the algorithm live (calls Building.setScheduler)"><option value="NEAREST">Nearest-Car</option><option value="SCAN">SCAN / LOOK</option></select></div>
+  </div>
+</header>
+<nav class="tabs" id="tabs">
+  <button data-tab="sim" class="on">Simulation</button><button data-tab="flow">Execution Flow</button>
+  <button data-tab="config">Configuration</button><button data-tab="algo">Algorithms</button>
+  <button data-tab="classes">Class Architecture</button><button data-tab="reports">Reports</button>
+</nav>
+<div id="banner" class="banner" hidden>⚠ Cannot reach the Java server. Is <code>run.bat</code> still running? The page reconnects by itself.</div>
+
+<main>
+<!-- ============ SIMULATION ============ -->
+<section id="tab-sim" class="tab on">
+  <div class="sim-grid">
+    <div class="panel building-panel">
+      <div class="ph"><h2>Glass building</h2>
+        <div class="legend"><i class="s-IDLE"></i>idle <i class="s-MOVING"></i>moving <i class="s-DOORS_OPEN"></i>doors open <i class="s-FAULT"></i>fault</div></div>
+      <div class="bld" id="bld"></div>
+      <p class="hint">Left of the shafts: passengers waiting on each floor (<code>P3→8</code> = passenger 3 going to floor 8; colour = the elevator the scheduler assigned). Floor numbers start at 0.</p>
+    </div>
+
+    <div class="panel controls">
+      <div class="ph"><h2>Controls</h2></div>
+      <div class="row"><label>From <input id="c-src" type="number" value="2" min="0"></label><label>To <input id="c-dst" type="number" value="8" min="0"></label>
+        <label>Weight kg <input id="c-w" type="number" value="70" min="1"></label><button id="b-add" class="primary">Add passenger</button></div>
+      <div class="row small"><button id="b-demo">Demo: floor 2 → 8</button><button id="b-badfloor" class="warn">Test invalid floor</button><button id="b-overload" class="warn">Test overload</button></div>
+      <div class="row"><button id="b-step">Step 1 tick</button><button id="b-run" class="primary">▶ Run</button>
+        <label class="grow">Speed <input id="c-speed" type="range" min="150" max="2000" step="50"> <output id="c-speed-v"></output></label></div>
+      <div class="row"><label>Random passengers <input id="c-rand" type="number" value="5" min="1" max="50"></label><button id="b-rand">Add random</button><button id="b-reset" class="danger">Reset</button></div>
+      <div class="row"><label>Elevator <select id="c-elev"></select></label><button id="b-break" class="danger">Break</button><button id="b-repair">Repair</button>
+        <label>Stop at <input id="c-stopf" type="number" value="4" min="0"></label><button id="b-stopcmd">Send stop command</button></div>
+      <div id="status-line" class="hint"></div>
+    </div>
+
+    <div class="panel exec">
+      <div class="ph"><h2>Live Java execution</h2><span id="exec-title" class="tag"></span>
+        <label class="chk"><input type="checkbox" id="follow" checked> follow latest</label></div>
+      <div id="exec-steps" class="steps"></div>
+    </div>
+  </div>
+
+  <div class="lower">
+    <div class="panel timeline">
+      <div class="ph"><h2>Event timeline</h2><div class="filters" id="filters"></div></div>
+      <div id="tl" class="tl"></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>Elevators</h2></div>
+      <div class="scroll"><table id="estats" class="tbl"></table></div>
+    </div>
+    <div class="panel">
+      <div class="ph"><h2>simulation.log</h2><button id="b-log" class="mini">Refresh</button><a class="mini" href="/api/log.txt" download="simulation.log">Download</a></div>
+      <pre id="log" class="log"></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ============ EXECUTION FLOW ============ -->
+<section id="tab-flow" class="tab">
+  <div class="flow-grid">
+    <div class="panel"><div class="ph"><h2>Actions</h2><small>each browser request = one action</small></div><div id="flow-actions" class="actions"></div></div>
+    <div class="panel"><div class="ph"><h2>Method calls in this action</h2><span id="flow-title" class="tag"></span></div><div id="flow-steps" class="steps"></div></div>
+  </div>
+</section>
+
+<!-- ============ CONFIGURATION ============ -->
+<section id="tab-config" class="tab">
+  <div class="panel"><div class="ph"><h2>config.txt — every property</h2><small>read live from the file by the Java server</small></div>
+    <div class="scroll"><table class="tbl" id="cfg-table"></table></div></div>
+  <div class="panel"><div class="ph"><h2>Change settings</h2><small>validated by <code>WebServer.handleConfig</code>, saved to config.txt, then the simulation resets</small></div>
+    <form id="cfg-form" class="cfg-form"></form>
+    <div id="cfg-result" class="hint"></div></div>
+</section>
+
+<!-- ============ ALGORITHMS ============ -->
+<section id="tab-algo" class="tab">
+  <div class="algo-grid">
+    <div class="panel"><div class="ph"><h2>Last real scheduling decision</h2><small>from the Java scheduler's own explain()</small></div><div id="algo-live" class="hint">No hall call has been scheduled yet. Add a passenger and step one tick.</div></div>
+    <div class="panel"><div class="ph"><h2>What-if: ask both schedulers</h2><small>same call, same elevators, nothing changes</small></div>
+      <div class="row"><label>Floor <input id="w-floor" type="number" value="5" min="0"></label>
+        <label>Direction <select id="w-dir"><option>UP</option><option>DOWN</option></select></label><button id="b-whatif" class="primary">Ask both</button></div>
+      <div id="algo-whatif" class="two"></div></div>
+    <div class="panel"><div class="ph"><h2>Compare on identical random passengers</h2><small>fresh buildings, seed from config</small></div>
+      <div class="row"><label>Passengers <input id="cmp-n" type="number" value="20" min="1" max="200"></label><button id="b-compare" class="primary">Run comparison</button></div>
+      <div id="algo-cmp"></div></div>
+    <div class="panel"><div class="ph"><h2>The algorithms (real Java source)</h2></div>
+      <div class="two" id="algo-src"></div></div>
+  </div>
+</section>
+
+<!-- ============ CLASSES ============ -->
+<section id="tab-classes" class="tab">
+  <div class="panel"><div class="ph"><h2>Class diagram</h2><small>built from Java reflection and the real source files</small>
+    <div class="filters" id="edge-filters"></div></div>
+    <div class="diagram-wrap"><div id="diagram" class="diagram"></div></div></div>
+  <div class="cls-grid"><div class="panel" id="cls-detail"><div class="hint">Click a class in the diagram.</div></div>
+    <div class="panel"><div class="ph"><h2>OOP concepts in this project</h2></div><div id="oop" class="oop"></div></div></div>
+</section>
+
+<!-- ============ REPORTS ============ -->
+<section id="tab-reports" class="tab">
+  <div class="panel"><div class="ph"><h2>Simulation report</h2><button id="b-report" class="primary">Generate report</button>
+    <a class="mini" href="/api/report.txt" download="report.txt">Download report.txt</a></div>
+    <div id="rep-cards" class="cards"></div></div>
+  <div class="two">
+    <div class="panel"><div class="ph"><h2>Per elevator</h2></div><div class="scroll"><table class="tbl" id="rep-elev"></table></div></div>
+    <div class="panel"><div class="ph"><h2>Configuration used</h2></div><table class="tbl" id="rep-cfg"></table></div>
+  </div>
+  <div class="panel"><div class="ph"><h2>report.txt</h2></div><pre id="rep-text" class="log"></pre></div>
+</section>
+</main>
+
+<div id="modal" class="modal" hidden><div class="modal-box"><div class="ph"><h2 id="m-title"></h2><button class="mini" id="m-close">Close</button></div><div id="m-body"></div></div></div>
+<div id="toasts" class="toasts"></div>
+<script src="app.js"></script>
+</body>
+</html>
