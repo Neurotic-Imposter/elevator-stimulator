@@ -1,32 +1,64 @@
+
 @echo off
 setlocal
 cd /d "%~dp0"
-title Elevator Simulator (Java engine + browser)
+
+title Elevator Simulator
+
+echo ==========================================
+echo       JAVA ELEVATOR SIMULATOR
+echo ==========================================
+echo.
 
 where java >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] Java was not found. Install a JDK 8 or newer from https://adoptium.net and run this file again.
-  pause & exit /b 1
-)
+if errorlevel 1 goto NOJAVA
+
 where javac >nul 2>nul
-if errorlevel 1 (
-  echo [ERROR] "javac" was not found. You have a JRE, but you need a JDK (the compiler). Install a JDK from https://adoptium.net
-  pause & exit /b 1
-)
+if errorlevel 1 goto NOJAVAC
 
 if not exist out mkdir out
-echo Compiling Java source...
-javac -encoding UTF-8 -d out src\*.java
-if errorlevel 1 (
-  echo [ERROR] Compilation failed. Read the messages above, fix the .java file, and run again.
-  pause & exit /b 1
-)
 
-echo Starting server. Your browser opens by itself. If it does not, open the address printed below.
-echo Close this window (or press Ctrl+C) to stop the simulator.
+echo [1/2] Compiling Java files...
+javac -encoding UTF-8 -d out src\*.java
+
+if errorlevel 1 goto COMPILEERROR
+
 echo.
+echo [2/2] Starting Elevator Simulator...
+echo.
+echo Open http://localhost:8080 in your browser.
+echo Keep this window open while using the application.
+echo Press Ctrl+C to stop the server.
+echo.
+
 java -cp out Main
-if errorlevel 1 (
-  echo [ERROR] The program stopped with an error. If it says the port is in use, change "port" in config.txt.
-)
+
+if errorlevel 1 goto RUNERROR
+
+goto END
+
+:NOJAVA
+echo ERROR: Java was not found.
+echo Install a JDK from https://adoptium.net
+goto FAILED
+
+:NOJAVAC
+echo ERROR: Java compiler javac was not found.
+echo Install a JDK, not just a JRE.
+goto FAILED
+
+:COMPILEERROR
+echo ERROR: Java compilation failed.
+goto FAILED
+
+:RUNERROR
+echo ERROR: The application stopped unexpectedly.
+echo Check the port and configuration.
+goto FAILED
+
+:FAILED
+pause
+exit /b 1
+
+:END
 pause
